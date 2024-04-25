@@ -1,0 +1,19 @@
+workspace = { members = ["examples/axum_memory"] }
+[package]
+name = "oauth-axum"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+oauth2 = "4.4.2"
+serde = "1.0.198"
+tokio = { version = "1.37.0", features = ["full"] }
+
+[dev-dependencies]
+axum = { version = "0.7.5", features = ["macros"] }
+
+[[example]]
+name = "axum_memory"
+path = "examples/axum_memory/src/main.rs"
