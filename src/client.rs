@@ -9,22 +9,25 @@ use oauth2::{AuthorizationCode, PkceCodeVerifier, TokenResponse};
 
 use crate::memory_db::AxumState;
 
-#[derive(Clone, serde::Deserialize)]
-pub struct QueryAxumCallback {
-    pub code: String,
-    pub state: String,
-}
-
 #[derive(Clone)]
 pub enum Provider {
     Google,
     Github,
+    Twitter,
+    Discord,
 }
 
 #[derive(Clone)]
 pub enum MethodExecute {
     DB,
     MEMORY,
+}
+
+#[derive(Clone)]
+pub struct DBOAuthModel {
+    pub url_generated: Option<String>,
+    pub state: String,
+    pub verifier: String,
 }
 
 #[derive(Clone)]
@@ -42,6 +45,8 @@ pub struct OAuthClient {
     method: MethodExecute,
     memory_state: Option<Arc<AxumState>>,
     pub url_generated: Option<String>,
+    pub db_state: Option<DBOAuthModel>,
+    provider: Provider,
 }
 
 impl OAuthClient {
@@ -68,10 +73,27 @@ impl OAuthClient {
                     client_secret,
                     redirect_url,
                 },
+
+                Provider::Twitter => Connector {
+                    auth_url: "https://twitter.com/i/oauth2/authorize".to_string(),
+                    token_url: "https://api.twitter.com/2/oauth2/token".to_string(),
+                    client_id,
+                    client_secret,
+                    redirect_url,
+                },
+                Provider::Discord => Connector {
+                    auth_url: "https://discord.com/oauth2/authorize".to_string(),
+                    token_url: "https://discord.com/api/oauth2/token".to_string(),
+                    client_id,
+                    client_secret,
+                    redirect_url,
+                },
             },
+            db_state: None,
             memory_state: None,
             method: MethodExecute::MEMORY,
             url_generated: None,
+            provider,
         }
     }
 
@@ -100,9 +122,13 @@ impl OAuthClient {
         self.connector.redirect_url = redirect_url;
     }
 
-    pub fn set_url_generated(mut self, url: String) -> Self {
+    fn set_url_generated(mut self, url: String) -> Self {
         self.url_generated = Some(url);
         self.clone()
+    }
+
+    pub fn get_db_state(&self) -> Option<DBOAuthModel> {
+        self.db_state.clone()
     }
 
     pub fn generate_url(self, scopes: Vec<String>) -> Self {
@@ -115,35 +141,41 @@ impl OAuthClient {
             .set_pkce_challenge(pkce_challenge)
             .url();
 
-        match self.method {
+        let mut binding = self.clone().set_url_generated(auth_url.to_string());
+
+        match binding.method {
             MethodExecute::MEMORY => {
-                self.memory_state.as_ref().unwrap().set(
+                binding.memory_state.as_ref().unwrap().set(
                     csrf_token.clone().secret().to_string(),
                     pkce_verifier.secret().to_string(),
                 );
                 println!(
                     "Generated URL: {:?}",
-                    self.memory_state.as_ref().unwrap().get_all_items()
+                    binding.memory_state.as_ref().unwrap().get_all_items()
                 );
             }
             MethodExecute::DB => {
-                // let _session = insert_provider_session(
-                //     &state.db,
-                //     ProviderSession {
-                //         id: uuid::Uuid::new_v4(),
-                //         state: csrf_token.clone().secret().to_string(),
-                //         verifier: pkce_verifier.secret().to_string(),
-                //         created_at: None,
-                //     },
-                // )
-                // .await
-                // .unwrap();
+                binding.db_state = Some(DBOAuthModel {
+                    url_generated: Some(auth_url.to_string()),
+                    state: csrf_token.secret().to_string(),
+                    verifier: pkce_verifier.secret().to_string(),
+                });
             }
-        }
-        self.set_url_generated(auth_url.to_string())
+        };
+        binding.clone()
     }
 
-    pub async fn generate_token(&self, state: String, code: String) -> String {
+    // pub async fn generate_token_db(&self, code: String, verifier: String) -> String {
+    //     let token = binding
+    //         .exchange_code(AuthorizationCode::new(code.clone()))
+    //         .set_pkce_verifier(PkceCodeVerifier::new(verifier.clone()))
+    //         .request_async(async_http_client)
+    //         .await
+    //         .unwrap();
+    //     token.access_token().secret().to_string()
+    // }
+
+    pub async fn generate_token_memory(&self, code: String, state: String) -> String {
         let binding = self.get_client();
         let token = binding
             .exchange_code(AuthorizationCode::new(code.clone()))

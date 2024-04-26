@@ -118,7 +118,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum_memory"
+name = "axum_discord_memory"
+version = "0.1.0"
+
+[[package]]
+name = "axum_github_memory"
+version = "0.1.0"
+
+[[package]]
+name = "axum_twitter_memory"
 version = "0.1.0"
 
 [[package]]

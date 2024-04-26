@@ -1,12 +1,12 @@
 [package]
-name = "axum_memory"
+name = "axum_github_memory"
 version = "0.1.0"
 edition = "2021"
 
 
 [[bin]]
-name = "axum_memory"
-path = "examples/axum_memory/src/main.rs"
+name = "axum_github_memory"
+path = "examples/axum_github_memory/src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

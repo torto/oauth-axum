@@ -1,4 +1,8 @@
-workspace = { members = ["examples/axum_memory"] }
+workspace = { members = [
+    "examples/axum_github_memory",
+    "examples/axum_discord_memory",
+    "examples/axum_twitter_memory",
+] }
 [package]
 name = "oauth-axum"
 version = "0.1.0"
@@ -8,12 +12,18 @@ edition = "2021"
 
 [dependencies]
 oauth2 = "4.4.2"
-serde = "1.0.198"
 tokio = { version = "1.37.0", features = ["full"] }
 
 [dev-dependencies]
+serde = "1.0.198"
 axum = { version = "0.7.5", features = ["macros"] }
 
 [[example]]
-name = "axum_memory"
-path = "examples/axum_memory/src/main.rs"
+name = "axum_github_memory"
+path = "examples/axum_github_memory/src/main.rs"
+[[example]]
+name = "axum_discord_memory"
+path = "examples/axum_discord_memory/src/main.rs"
+[[example]]
+name = "axum_twitter_memory"
+path = "examples/axum_twitter_memory/src/main.rs"
