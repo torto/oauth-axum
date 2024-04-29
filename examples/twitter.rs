@@ -32,8 +32,8 @@ async fn main() {
 fn get_client() -> OAuthClient {
     OAuthClient::new(
         Provider::Twitter,
-        "VHpFTFBWa29qVllnc3JrcUpPM206MTpjaQ".to_string(),
-        "7iIYWfgS0mj46PIVO85d91TOjATFrFF4bC_ARRngoBo_rwVuaa".to_string(),
+        "XX".to_string(),
+        "XX".to_string(),
         "http://localhost:3000/api/v1/twitter/callback".to_string(),
     )
 }

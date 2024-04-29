@@ -32,8 +32,8 @@ async fn main() {
 fn get_client() -> OAuthClient {
     OAuthClient::new(
         Provider::Discord,
-        "1233429621748531333".to_string(),
-        "jz6LQgN7DY8jIbSVLu4ivZFkbAdWr_qa".to_string(),
+        "XX".to_string(),
+        "XX".to_string(),
         "http://localhost:3000/api/v1/discord/callback".to_string(),
     )
 }

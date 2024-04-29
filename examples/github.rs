@@ -32,8 +32,8 @@ async fn main() {
 fn get_client() -> OAuthClient {
     OAuthClient::new(
         Provider::Github,
-        "c891ea6e3e0a9b38d0be".to_string(),
-        "6fc0b4e7c380c8ecd6f7a00d95eae1141aa7f543".to_string(),
+        "XX".to_string(),
+        "XX".to_string(),
         "http://localhost:3000/api/v1/github/callback".to_string(),
     )
 }
