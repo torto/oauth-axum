@@ -3,8 +3,8 @@ use std::sync::Arc;
 use axum::extract::Query;
 use axum::Router;
 use axum::{routing::get, Extension};
-use oauth_axum::client::{OAuthClient, Provider};
 use oauth_axum::memory_db::AxumState;
+use oauth_axum::{OAuthClient, Provider};
 
 #[derive(Clone, serde::Deserialize)]
 pub struct QueryAxumCallback {
@@ -19,7 +19,7 @@ async fn main() {
     let state = Arc::new(AxumState::new());
     let app = Router::new()
         .route("/", get(create_url))
-        .route("/api/v1/github/callback", get(callback))
+        .route("/api/v1/twitter/callback", get(callback))
         .layer(Extension(state.clone()));
 
     println!("🚀 Server started successfully");
@@ -31,17 +31,17 @@ async fn main() {
 
 fn get_client() -> OAuthClient {
     OAuthClient::new(
-        Provider::Github,
-        "c891ea6e3e0a9b38d0be".to_string(),
-        "6fc0b4e7c380c8ecd6f7a00d95eae1141aa7f543".to_string(),
-        "http://localhost:3000/api/v1/github/callback".to_string(),
+        Provider::Twitter,
+        "VHpFTFBWa29qVllnc3JrcUpPM206MTpjaQ".to_string(),
+        "7iIYWfgS0mj46PIVO85d91TOjATFrFF4bC_ARRngoBo_rwVuaa".to_string(),
+        "http://localhost:3000/api/v1/twitter/callback".to_string(),
     )
 }
 
 pub async fn create_url(Extension(state): Extension<Arc<AxumState>>) -> String {
     get_client()
         .set_memory_state(Arc::clone(&state))
-        .generate_url(Vec::from(["read:user".to_string()]))
+        .generate_url(Vec::from(["users.read".to_string()]))
         .url_generated
         .unwrap_or_default()
 }

@@ -1,0 +1,25 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres-oauth
+    ports:
+      - "5432:5432"
+    volumes:
+      - progresDB:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_HOST=127.0.0.1
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=rust_hs256
+  pgAdmin:
+    image: dpage/pgadmin4
+    container_name: pgAdmin-oauth
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=password123
+    ports:
+      - "5050:80"
+volumes:
+  progresDB:
