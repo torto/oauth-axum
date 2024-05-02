@@ -3,8 +3,9 @@ use std::sync::Arc;
 use axum::extract::Query;
 use axum::Router;
 use axum::{routing::get, Extension};
+use oauth_axum::github::GithubProvider;
 use oauth_axum::memory_db::AxumState;
-use oauth_axum::{OAuthClient, Provider};
+use oauth_axum::{CustomProvider, OAuthClient};
 
 #[derive(Clone, serde::Deserialize)]
 pub struct QueryAxumCallback {
@@ -29,11 +30,10 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-fn get_client() -> OAuthClient {
-    OAuthClient::new(
-        Provider::Github,
-        "XX".to_string(),
-        "XX".to_string(),
+fn get_client() -> CustomProvider {
+    GithubProvider::new(
+        "c891ea6e3e0a9b38d0be".to_string(),
+        "6fc0b4e7c380c8ecd6f7a00d95eae1141aa7f543".to_string(),
         "http://localhost:3000/api/v1/github/callback".to_string(),
     )
 }

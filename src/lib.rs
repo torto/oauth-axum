@@ -212,7 +212,9 @@
 //! - Add more Providers
 
 pub mod memory_db;
+pub mod providers;
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
 use oauth2::reqwest::async_http_client;
@@ -225,11 +227,16 @@ use oauth2::{AuthorizationCode, PkceCodeVerifier, TokenResponse};
 use crate::memory_db::AxumState;
 
 #[derive(Clone)]
-pub enum Provider {
-    Google,
-    Github,
-    Twitter,
-    Discord,
+pub struct CustomProvider {
+    auth_url: String,
+    token_url: String,
+    client_id: String,
+    client_secret: String,
+    redirect_url: String,
+    method: MethodExecute,
+    memory_state: Option<Arc<AxumState>>,
+    pub url_generated: Option<String>,
+    pub db_state: Option<DBOAuthModel>,
 }
 
 #[derive(Clone)]
@@ -245,105 +252,97 @@ pub struct DBOAuthModel {
     pub verifier: String,
 }
 
-#[derive(Clone)]
-struct Connector {
-    auth_url: String,
-    token_url: String,
-    client_id: String,
-    client_secret: String,
-    redirect_url: String,
-}
-
-#[derive(Clone)]
-pub struct OAuthClient {
-    connector: Connector,
-    method: MethodExecute,
-    memory_state: Option<Arc<AxumState>>,
-    pub url_generated: Option<String>,
-    pub db_state: Option<DBOAuthModel>,
-}
-
-/// OAuthClient is the main struct of the lib, it will handle all the connection with the provider
-impl OAuthClient {
-    /// Create a new instance of OAuthClient
-    /// # Arguments
-    /// * `provider` - Provider that you want to connect
-    /// * `client_id` - Client ID of the provider
-    /// * `client_secret` - Client Secret of the provider
-    /// * `redirect_url` - URL that the provider will redirect after the user accept the auth
-    /// # Example
-    /// ```rust
-    /// use oauth_axum::client::{OAuthClient, Provider};
-    /// let client = OAuthClient::new(
-    ///    Provider::Github,
-    ///   "CLIENT_ID".to_string(),
-    ///   "CLIENT_SECRET".to_string(),
-    ///   "URL_CALLBACK".to_string(),
-    /// );
-    /// ```
-    /// # Return
-    /// A new instance of OAuthClient
+impl CustomProvider {
     pub fn new(
-        provider: Provider,
+        auth_url: String,
+        token_url: String,
         client_id: String,
         client_secret: String,
         redirect_url: String,
     ) -> Self {
-        OAuthClient {
-            connector: match provider.clone() {
-                Provider::Google => Connector {
-                    auth_url: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
-                    token_url: "https://oauth2.googleapis.com/token".to_string(),
-                    client_id,
-                    client_secret,
-                    redirect_url,
-                },
-
-                Provider::Github => Connector {
-                    auth_url: "https://github.com/login/oauth/authorize".to_string(),
-                    token_url: "https://github.com/login/oauth/access_token".to_string(),
-                    client_id,
-                    client_secret,
-                    redirect_url,
-                },
-
-                Provider::Twitter => Connector {
-                    auth_url: "https://twitter.com/i/oauth2/authorize".to_string(),
-                    token_url: "https://api.twitter.com/2/oauth2/token".to_string(),
-                    client_id,
-                    client_secret,
-                    redirect_url,
-                },
-                Provider::Discord => Connector {
-                    auth_url: "https://discord.com/oauth2/authorize".to_string(),
-                    token_url: "https://discord.com/api/oauth2/token".to_string(),
-                    client_id,
-                    client_secret,
-                    redirect_url,
-                },
-            },
+        CustomProvider {
+            auth_url,
+            token_url,
+            client_id,
+            client_secret,
+            redirect_url,
+            method: MethodExecute::MEMORY,
             db_state: None,
             memory_state: None,
-            method: MethodExecute::MEMORY,
             url_generated: None,
         }
     }
+}
 
+/// OAuthClient is the main struct of the lib, it will handle all the connection with the provider
+#[async_trait]
+pub trait OAuthClient {
+    fn get_client(&self) -> BasicClient;
+
+    /// Set the memory state to the lib, this is necessary to save the state and verifier in the memory
+    /// # Arguments
+    /// * `state` - Arc<AxumState> - The state that will handle the memory save
+    fn set_memory_state(self, state: Arc<AxumState>) -> Self;
+
+    /// Set the method to the lib, this is necessary to choose the method that the lib will use to save the state and verifier
+    /// # Arguments
+    /// * `method` - MethodExecute - The method that will be used to save the state and verifier
+    fn set_method(self, method: MethodExecute) -> Self;
+
+    fn set_redirect_url(self, redirect_url: String);
+
+    fn set_url_generated(self, url: String) -> Self;
+
+    /// Get the state and verifier from the memory
+    /// # Return
+    /// A tuple with the state and verifier
+    /// # Example
+    /// ```rust
+    /// let (state, verifier) = get_client().get_memory_state();
+    /// ```
+    fn get_db_state(&self) -> Option<DBOAuthModel>;
+
+    /// Genrate the URL to redirect the user to the provider
+    /// # Arguments
+    /// * `scopes` - Vec<String> - The scopes that you want to access in the provider
+    /// # Return
+    /// A new instance of OAuthClient with the URL generated
+    fn generate_url(self, scopes: Vec<String>) -> Self;
+
+    /// Generate the token from the code and verifier using db method
+    /// # Arguments
+    /// * `code` - String - The code that the provider will return after the user accept the auth
+    /// * `verifier` - String - The verifier that was generated in the first step
+    /// # Return
+    /// The token generated
+    async fn generate_token_db(&self, code: String, verifier: String) -> String;
+
+    /// Generate the token from the code and verifier using memory method
+    /// # Arguments
+    /// * `code` - String - The code that the provider will return after the user accept the auth
+    /// * `state` - String - The state that was generated in the first step
+    /// # Return
+    /// The token generated
+    async fn generate_token_memory(&self, code: String, state: String) -> String;
+}
+
+#[async_trait]
+impl OAuthClient for CustomProvider {
     fn get_client(&self) -> BasicClient {
         BasicClient::new(
-            ClientId::new(self.connector.client_id.clone()),
-            Some(ClientSecret::new(self.connector.client_secret.clone())),
-            AuthUrl::new(self.connector.auth_url.clone()).unwrap(),
-            Some(TokenUrl::new(self.connector.token_url.clone()).unwrap()),
+            ClientId::new(self.client_id.clone()),
+            Some(ClientSecret::new(self.client_secret.clone())),
+            AuthUrl::new(self.auth_url.clone()).unwrap(),
+            Some(TokenUrl::new(self.token_url.clone()).unwrap()),
         )
-        .set_redirect_uri(RedirectUrl::new(self.connector.redirect_url.clone()).unwrap())
+        .set_redirect_uri(RedirectUrl::new(self.redirect_url.clone()).unwrap())
         .clone()
     }
 
     /// Set the memory state to the lib, this is necessary to save the state and verifier in the memory
     /// # Arguments
     /// * `state` - Arc<AxumState> - The state that will handle the memory save
-    pub fn set_memory_state(mut self, state: Arc<AxumState>) -> Self {
+    fn set_memory_state(mut self, state: Arc<AxumState>) -> Self {
         self.memory_state = Some(state);
         self.clone()
     }
@@ -351,13 +350,13 @@ impl OAuthClient {
     /// Set the method to the lib, this is necessary to choose the method that the lib will use to save the state and verifier
     /// # Arguments
     /// * `method` - MethodExecute - The method that will be used to save the state and verifier
-    pub fn set_method(mut self, method: MethodExecute) -> Self {
+    fn set_method(mut self, method: MethodExecute) -> Self {
         self.method = method;
         self.clone()
     }
 
-    pub fn set_redirect_url(&mut self, redirect_url: String) {
-        self.connector.redirect_url = redirect_url;
+    fn set_redirect_url(mut self, redirect_url: String) {
+        self.redirect_url = redirect_url;
     }
 
     fn set_url_generated(mut self, url: String) -> Self {
@@ -372,7 +371,7 @@ impl OAuthClient {
     /// ```rust
     /// let (state, verifier) = get_client().get_memory_state();
     /// ```
-    pub fn get_db_state(&self) -> Option<DBOAuthModel> {
+    fn get_db_state(&self) -> Option<DBOAuthModel> {
         self.db_state.clone()
     }
 
@@ -381,7 +380,7 @@ impl OAuthClient {
     /// * `scopes` - Vec<String> - The scopes that you want to access in the provider
     /// # Return
     /// A new instance of OAuthClient with the URL generated
-    pub fn generate_url(self, scopes: Vec<String>) -> Self {
+    fn generate_url(self, scopes: Vec<String>) -> Self {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
         let binding = self.get_client();
@@ -421,7 +420,7 @@ impl OAuthClient {
     /// * `verifier` - String - The verifier that was generated in the first step
     /// # Return
     /// The token generated
-    pub async fn generate_token_db(&self, code: String, verifier: String) -> String {
+    async fn generate_token_db(&self, code: String, verifier: String) -> String {
         let token = self
             .get_client()
             .exchange_code(AuthorizationCode::new(code.clone()))
@@ -438,9 +437,9 @@ impl OAuthClient {
     /// * `state` - String - The state that was generated in the first step
     /// # Return
     /// The token generated
-    pub async fn generate_token_memory(&self, code: String, state: String) -> String {
-        let binding = self.get_client();
-        let token = binding
+    async fn generate_token_memory(&self, code: String, state: String) -> String {
+        let token = self
+            .get_client()
             .exchange_code(AuthorizationCode::new(code.clone()))
             .set_pkce_verifier(PkceCodeVerifier::new(
                 self.memory_state.as_ref().unwrap().get(state).unwrap(),
