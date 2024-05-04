@@ -69,8 +69,16 @@ fn get_client() -> OAuthClient {
 
 pub async fn create_url(State(state): State<Arc<Client>>) -> String {
     let state_db = get_client()
-        .generate_url(Vec::from(["read:user".to_string()]))
-        .db_state
+        .generate_url(Vec::from(["read:user".to_string()]), |state_e| async move {
+            state
+                .execute(
+                    "INSERT INTO oauth (state, verifier) VALUES ($1, $2)",
+                    &[&state_e.state, &state_e.verifier],
+                )
+                .await
+                .unwrap();
+        })
+        .state
         .unwrap();
 
     state

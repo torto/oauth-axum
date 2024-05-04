@@ -1,10 +1,11 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::extract::Query;
 use axum::Router;
 use axum::{routing::get, Extension};
-use oauth_axum::github::GithubProvider;
-use oauth_axum::memory_db::AxumState;
+use oauth_axum::memory_db::{AxumState, ItemOauthAxum};
+use oauth_axum::providers::github::GithubProvider;
 use oauth_axum::{CustomProvider, OAuthClient};
 
 #[derive(Clone, serde::Deserialize)]
@@ -15,6 +16,7 @@ pub struct QueryAxumCallback {
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
     println!("Starting server...");
 
     let state = Arc::new(AxumState::new());
@@ -40,10 +42,15 @@ fn get_client() -> CustomProvider {
 
 pub async fn create_url(Extension(state): Extension<Arc<AxumState>>) -> String {
     get_client()
-        .set_memory_state(Arc::clone(&state))
-        .generate_url(Vec::from(["read:user".to_string()]))
+        .generate_url(Vec::from(["read:user".to_string()]), |state_e| async move {
+            state.set(state_e.state, state_e.verifier);
+        })
+        .await
+        .unwrap()
+        .state
+        .unwrap()
         .url_generated
-        .unwrap_or_default()
+        .unwrap()
 }
 
 pub async fn callback(
@@ -51,8 +58,8 @@ pub async fn callback(
     Query(queries): Query<QueryAxumCallback>,
 ) -> String {
     println!("{:?}", state.clone().get_all_items());
+    let item = state.get(queries.state.clone());
     get_client()
-        .set_memory_state(Arc::clone(&state))
-        .generate_token_memory(queries.code, queries.state)
+        .generate_token(queries.code, item.unwrap())
         .await
 }

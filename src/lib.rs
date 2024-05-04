@@ -215,7 +215,8 @@ pub mod memory_db;
 pub mod providers;
 
 use async_trait::async_trait;
-use std::sync::Arc;
+use oauth2::http::Error;
+use std::future::Future;
 
 use oauth2::reqwest::async_http_client;
 use oauth2::{
@@ -224,19 +225,14 @@ use oauth2::{
 };
 use oauth2::{AuthorizationCode, PkceCodeVerifier, TokenResponse};
 
-use crate::memory_db::AxumState;
-
 #[derive(Clone)]
 pub struct CustomProvider {
-    auth_url: String,
-    token_url: String,
-    client_id: String,
-    client_secret: String,
-    redirect_url: String,
-    method: MethodExecute,
-    memory_state: Option<Arc<AxumState>>,
-    pub url_generated: Option<String>,
-    pub db_state: Option<DBOAuthModel>,
+    pub auth_url: String,
+    pub token_url: String,
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_url: String,
+    pub state: Option<StateAuth>,
 }
 
 #[derive(Clone)]
@@ -245,8 +241,8 @@ pub enum MethodExecute {
     MEMORY,
 }
 
-#[derive(Clone)]
-pub struct DBOAuthModel {
+#[derive(Clone, Debug)]
+pub struct StateAuth {
     pub url_generated: Option<String>,
     pub state: String,
     pub verifier: String,
@@ -266,10 +262,7 @@ impl CustomProvider {
             client_id,
             client_secret,
             redirect_url,
-            method: MethodExecute::MEMORY,
-            db_state: None,
-            memory_state: None,
-            url_generated: None,
+            state: None,
         }
     }
 }
@@ -279,20 +272,6 @@ impl CustomProvider {
 pub trait OAuthClient {
     fn get_client(&self) -> BasicClient;
 
-    /// Set the memory state to the lib, this is necessary to save the state and verifier in the memory
-    /// # Arguments
-    /// * `state` - Arc<AxumState> - The state that will handle the memory save
-    fn set_memory_state(self, state: Arc<AxumState>) -> Self;
-
-    /// Set the method to the lib, this is necessary to choose the method that the lib will use to save the state and verifier
-    /// # Arguments
-    /// * `method` - MethodExecute - The method that will be used to save the state and verifier
-    fn set_method(self, method: MethodExecute) -> Self;
-
-    fn set_redirect_url(self, redirect_url: String);
-
-    fn set_url_generated(self, url: String) -> Self;
-
     /// Get the state and verifier from the memory
     /// # Return
     /// A tuple with the state and verifier
@@ -300,14 +279,21 @@ pub trait OAuthClient {
     /// ```rust
     /// let (state, verifier) = get_client().get_memory_state();
     /// ```
-    fn get_db_state(&self) -> Option<DBOAuthModel>;
+    fn get_state(&self) -> Option<StateAuth>;
 
     /// Genrate the URL to redirect the user to the provider
     /// # Arguments
     /// * `scopes` - Vec<String> - The scopes that you want to access in the provider
     /// # Return
     /// A new instance of OAuthClient with the URL generated
-    fn generate_url(self, scopes: Vec<String>) -> Self;
+    async fn generate_url<F, Fut>(
+        mut self,
+        scopes: Vec<String>,
+        save: F,
+    ) -> Result<Box<Self>, Error>
+    where
+        F: FnOnce(StateAuth) -> Fut + Send,
+        Fut: Future<Output = ()> + Send;
 
     /// Generate the token from the code and verifier using db method
     /// # Arguments
@@ -315,15 +301,7 @@ pub trait OAuthClient {
     /// * `verifier` - String - The verifier that was generated in the first step
     /// # Return
     /// The token generated
-    async fn generate_token_db(&self, code: String, verifier: String) -> String;
-
-    /// Generate the token from the code and verifier using memory method
-    /// # Arguments
-    /// * `code` - String - The code that the provider will return after the user accept the auth
-    /// * `state` - String - The state that was generated in the first step
-    /// # Return
-    /// The token generated
-    async fn generate_token_memory(&self, code: String, state: String) -> String;
+    async fn generate_token(&self, code: String, verifier: String) -> String;
 }
 
 #[async_trait]
@@ -336,32 +314,6 @@ impl OAuthClient for CustomProvider {
             Some(TokenUrl::new(self.token_url.clone()).unwrap()),
         )
         .set_redirect_uri(RedirectUrl::new(self.redirect_url.clone()).unwrap())
-        .clone()
-    }
-
-    /// Set the memory state to the lib, this is necessary to save the state and verifier in the memory
-    /// # Arguments
-    /// * `state` - Arc<AxumState> - The state that will handle the memory save
-    fn set_memory_state(mut self, state: Arc<AxumState>) -> Self {
-        self.memory_state = Some(state);
-        self.clone()
-    }
-
-    /// Set the method to the lib, this is necessary to choose the method that the lib will use to save the state and verifier
-    /// # Arguments
-    /// * `method` - MethodExecute - The method that will be used to save the state and verifier
-    fn set_method(mut self, method: MethodExecute) -> Self {
-        self.method = method;
-        self.clone()
-    }
-
-    fn set_redirect_url(mut self, redirect_url: String) {
-        self.redirect_url = redirect_url;
-    }
-
-    fn set_url_generated(mut self, url: String) -> Self {
-        self.url_generated = Some(url);
-        self.clone()
     }
 
     /// Get the state and verifier from the memory
@@ -371,8 +323,8 @@ impl OAuthClient for CustomProvider {
     /// ```rust
     /// let (state, verifier) = get_client().get_memory_state();
     /// ```
-    fn get_db_state(&self) -> Option<DBOAuthModel> {
-        self.db_state.clone()
+    fn get_state(&self) -> Option<StateAuth> {
+        self.state.clone()
     }
 
     /// Genrate the URL to redirect the user to the provider
@@ -380,7 +332,15 @@ impl OAuthClient for CustomProvider {
     /// * `scopes` - Vec<String> - The scopes that you want to access in the provider
     /// # Return
     /// A new instance of OAuthClient with the URL generated
-    fn generate_url(self, scopes: Vec<String>) -> Self {
+    async fn generate_url<F, Fut>(
+        mut self,
+        scopes: Vec<String>,
+        save: F,
+    ) -> Result<Box<Self>, Error>
+    where
+        F: FnOnce(StateAuth) -> Fut + Send,
+        Fut: Future<Output = ()> + Send,
+    {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
         let binding = self.get_client();
@@ -390,28 +350,18 @@ impl OAuthClient for CustomProvider {
             .set_pkce_challenge(pkce_challenge)
             .url();
 
-        let mut binding = self.clone().set_url_generated(auth_url.to_string());
-
-        match binding.method {
-            MethodExecute::MEMORY => {
-                binding.memory_state.as_ref().unwrap().set(
-                    csrf_token.clone().secret().to_string(),
-                    pkce_verifier.secret().to_string(),
-                );
-                println!(
-                    "Generated URL: {:?}",
-                    binding.memory_state.as_ref().unwrap().get_all_items()
-                );
-            }
-            MethodExecute::DB => {
-                binding.db_state = Some(DBOAuthModel {
-                    url_generated: Some(auth_url.to_string()),
-                    state: csrf_token.secret().to_string(),
-                    verifier: pkce_verifier.secret().to_string(),
-                });
-            }
+        let state = StateAuth {
+            url_generated: Some(auth_url.to_string()),
+            state: csrf_token.secret().to_string(),
+            verifier: pkce_verifier.secret().to_string(),
         };
-        binding.clone()
+
+        self.state = Some(state.clone());
+        println!("State: ANTES");
+        save(state).await;
+        println!("State: FINAL");
+
+        Ok(Box::new(self.clone()))
     }
 
     /// Generate the token from the code and verifier using db method
@@ -420,30 +370,11 @@ impl OAuthClient for CustomProvider {
     /// * `verifier` - String - The verifier that was generated in the first step
     /// # Return
     /// The token generated
-    async fn generate_token_db(&self, code: String, verifier: String) -> String {
+    async fn generate_token(&self, code: String, verifier: String) -> String {
         let token = self
             .get_client()
             .exchange_code(AuthorizationCode::new(code.clone()))
             .set_pkce_verifier(PkceCodeVerifier::new(verifier.clone()))
-            .request_async(async_http_client)
-            .await
-            .unwrap();
-        token.access_token().secret().to_string()
-    }
-
-    /// Generate the token from the code and verifier using memory method
-    /// # Arguments
-    /// * `code` - String - The code that the provider will return after the user accept the auth
-    /// * `state` - String - The state that was generated in the first step
-    /// # Return
-    /// The token generated
-    async fn generate_token_memory(&self, code: String, state: String) -> String {
-        let token = self
-            .get_client()
-            .exchange_code(AuthorizationCode::new(code.clone()))
-            .set_pkce_verifier(PkceCodeVerifier::new(
-                self.memory_state.as_ref().unwrap().get(state).unwrap(),
-            ))
             .request_async(async_http_client)
             .await
             .unwrap();
