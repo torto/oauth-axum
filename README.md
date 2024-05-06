@@ -45,14 +45,16 @@ After that, you will have a token to access the API in the provider.
 This method is for a small project that will run in one unique instance of Axum. It saves the state and verifier in memory, which can be accessible in the callback URL call.
 
 ```rust 
+mod utils;
 use std::sync::Arc;
 
 use axum::extract::Query;
 use axum::Router;
 use axum::{routing::get, Extension};
-use oauth_axum::memory_db::AxumState;
 use oauth_axum::providers::twitter::TwitterProvider;
 use oauth_axum::{CustomProvider, OAuthClient};
+
+use crate::utils::memory_db_util::AxumState;
 
 #[derive(Clone, serde::Deserialize)]
 pub struct QueryAxumCallback {
@@ -91,6 +93,8 @@ pub async fn create_url(Extension(state): Extension<Arc<AxumState>>) -> String {
         .generate_url(
             Vec::from(["users.read".to_string()]),
             |state_e| async move {
+                //SAVE THE DATA IN THE DB OR MEMORY
+                //state should be your ID
                 state.set(state_e.state, state_e.verifier);
             },
         )
@@ -107,6 +111,8 @@ pub async fn callback(
     Query(queries): Query<QueryAxumCallback>,
 ) -> String {
     println!("{:?}", state.clone().get_all_items());
+    // GET DATA FROM DB OR MEMORY
+    // get data using state as ID
     let item = state.get(queries.state.clone());
     get_client()
         .generate_token(queries.code, item.unwrap())
