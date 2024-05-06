@@ -357,9 +357,7 @@ impl OAuthClient for CustomProvider {
         };
 
         self.state = Some(state.clone());
-        println!("State: ANTES");
         save(state).await;
-        println!("State: FINAL");
 
         Ok(Box::new(self.clone()))
     }

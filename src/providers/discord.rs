@@ -1,8 +1,8 @@
 use crate::CustomProvider;
 
-pub struct GoogleProvider {}
+pub struct DiscordProvider {}
 
-impl GoogleProvider {
+impl DiscordProvider {
     pub fn new(client_id: String, client_secret: String, redirect_url: String) -> CustomProvider {
         CustomProvider::new(
             String::from("https://discord.com/oauth2/authorize"),

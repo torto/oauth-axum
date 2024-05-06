@@ -1,8 +1,8 @@
 use crate::CustomProvider;
 
-pub struct GoogleProvider {}
+pub struct TwitterProvider {}
 
-impl GoogleProvider {
+impl TwitterProvider {
     pub fn new(client_id: String, client_secret: String, redirect_url: String) -> CustomProvider {
         CustomProvider::new(
             String::from("https://twitter.com/i/oauth2/authorize"),
