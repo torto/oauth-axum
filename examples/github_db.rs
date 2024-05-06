@@ -3,7 +3,8 @@ use std::sync::Arc;
 use axum::extract::{Query, State};
 use axum::routing::get;
 use axum::Router;
-use oauth_axum::{MethodExecute, OAuthClient, Provider};
+use oauth_axum::providers::github::GithubProvider;
+use oauth_axum::{CustomProvider, OAuthClient};
 
 #[derive(Clone, serde::Deserialize)]
 pub struct QueryAxumCallback {
@@ -15,6 +16,7 @@ use tokio_postgres::{Client, NoTls};
 
 #[tokio::main]
 async fn main() {
+    dotenv::from_filename("examples/.env").ok();
     println!("Starting server...");
 
     let (client, connection) = tokio_postgres::connect(
@@ -57,31 +59,31 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-fn get_client() -> OAuthClient {
-    OAuthClient::new(
-        Provider::Github,
-        "XX".to_string(),
-        "XX".to_string(),
+fn get_client() -> CustomProvider {
+    GithubProvider::new(
+        std::env::var("GITHUB_CLIENT_ID").expect("GITHUB_CLIENT_ID must be set"),
+        std::env::var("GITHUB_SECRET").expect("GITHUB_SECRET must be set"),
         "http://localhost:3000/api/v1/github/callback".to_string(),
     )
-    .set_method(MethodExecute::DB)
 }
 
 pub async fn create_url(State(state): State<Arc<Client>>) -> String {
-    let state_db = get_client()
-        .generate_url(Vec::from(["read:user".to_string()]))
-        .db_state
-        .unwrap();
-
-    state
-        .execute(
-            "INSERT INTO oauth (state, verifier) VALUES ($1, $2)",
-            &[&state_db.state, &state_db.verifier],
-        )
+    let state_oauth = get_client()
+        .generate_url(Vec::from(["read:user".to_string()]), |state_e| async move {
+            state
+                .execute(
+                    "INSERT INTO oauth (state, verifier) VALUES ($1, $2)",
+                    &[&state_e.state, &state_e.verifier],
+                )
+                .await
+                .unwrap();
+        })
         .await
+        .unwrap()
+        .state
         .unwrap();
 
-    state_db.url_generated.unwrap_or_default()
+    state_oauth.url_generated.unwrap()
 }
 
 pub async fn callback(
@@ -96,7 +98,5 @@ pub async fn callback(
         .await
         .unwrap();
 
-    get_client()
-        .generate_token_db(queries.code, row.get(0))
-        .await
+    get_client().generate_token(queries.code, row.get(0)).await
 }

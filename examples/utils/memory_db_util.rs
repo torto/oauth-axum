@@ -12,8 +12,8 @@ pub struct AxumState {
 
 #[derive(Clone, Debug)]
 pub struct ItemOauthAxum {
-    verifier: String,
-    created_at: SystemTime,
+    pub verifier: String,
+    pub created_at: SystemTime,
 }
 
 impl AxumState {
