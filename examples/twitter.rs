@@ -1,11 +1,13 @@
+mod utils;
 use std::sync::Arc;
 
 use axum::extract::Query;
 use axum::Router;
 use axum::{routing::get, Extension};
-use oauth_axum::memory_db::AxumState;
 use oauth_axum::providers::twitter::TwitterProvider;
 use oauth_axum::{CustomProvider, OAuthClient};
+
+use crate::utils::memory_db_util::AxumState;
 
 #[derive(Clone, serde::Deserialize)]
 pub struct QueryAxumCallback {
