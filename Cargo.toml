@@ -30,3 +30,6 @@ name = "discord"
 
 [[example]]
 name = "twitter"
+
+[[example]]
+name = "facebook"
