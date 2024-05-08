@@ -13,6 +13,7 @@ To use it, it's very simple. Just create a new instance of some provider:
 - TwitterProvider
 - GoogleProvider
 - FacebookProvider
+- SpotifyProvider
 
 in your project, pass to the `new` function:
 

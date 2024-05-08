@@ -13,6 +13,7 @@
 //! - TwitterProvider
 //! - GoogleProvider
 //! - FacebookProvider
+//! - SpotifyProvider
 //!
 //! in your project, pass to the ```new``` function:
 //!
