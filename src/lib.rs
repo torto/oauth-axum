@@ -126,6 +126,7 @@
 //! - Add more Providers
 //!
 
+pub mod openid;
 pub mod providers;
 
 use async_trait::async_trait;
