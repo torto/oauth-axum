@@ -12,13 +12,14 @@
 //! - DiscordProvider
 //! - TwitterProvider
 //! - GoogleProvider
+//! - FacebookProvider
 //!
 //! in your project, pass to the ```new``` function:
 //!
 //!   - **client_id:** Unique ID from the app created in your provider
 //!   - **secret_id:** Secret token from your app inside the provider, this token needs to be hidden from the users
 //!   - **redirect_url:** URL from your backend that will accept the return from the provider
-//!   
+//!
 //!   If you are using **``CustomProvider``** you need to pass:
 //!
 //!   - **auth_url:** URL from your provider that is used to get the permission of your app access user account

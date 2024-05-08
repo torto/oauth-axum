@@ -12,13 +12,14 @@ To use it, it's very simple. Just create a new instance of some provider:
 - DiscordProvider
 - TwitterProvider
 - GoogleProvider
+- FacebookProvider
 
 in your project, pass to the `new` function:
 
 - **client_id:** Unique ID from the app created in your provider
 - **secret_id:** Secret token from your app inside the provider, this token needs to be hidden from the users
 - **redirect_url:** URL from your backend that will accept the return from the provider
-  
+
   If you are using **`CustomProvider`** you need to pass:
 
 - **auth_url:** URL from your provider that is used to get the permission of your app access user account
@@ -36,7 +37,7 @@ This step is important because that will generate the VERIFIER field, it is need
 
 ### 2. Callback URL
 
-After the user accepts the auth from the provider, it will redirect the user to the specific URL that you added in the config of the provider ``redirect_url``, and is important to remember that the same URL should be set in the oauth-axum params, if it is not the same an error will happen. 
+After the user accepts the auth from the provider, it will redirect the user to the specific URL that you added in the config of the provider `redirect_url`, and is important to remember that the same URL should be set in the oauth-axum params, if it is not the same an error will happen.
 This redirect will have two query parameters, CODE and STATE, we need to generate a token from the code and verifier fields, which is the reason that in the first step, you need to save the verifier and state together.
 After that, you will have a token to access the API in the provider.
 
@@ -44,7 +45,7 @@ After that, you will have a token to access the API in the provider.
 
 This method is for a small project that will run in one unique instance of Axum. It saves the state and verifier in memory, which can be accessible in the callback URL call.
 
-```rust 
+```rust
 mod utils;
 use std::sync::Arc;
 
