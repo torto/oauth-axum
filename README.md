@@ -12,6 +12,7 @@ To use it, it's very simple. Just create a new instance of some provider:
 - DiscordProvider
 - TwitterProvider
 - GoogleProvider
+- MicrosoftProvider
 
 in your project, pass to the `new` function:
 

@@ -12,6 +12,7 @@
 //! - DiscordProvider
 //! - TwitterProvider
 //! - GoogleProvider
+//! - MicrosoftProvider
 //!
 //! in your project, pass to the ```new``` function:
 //!
