@@ -12,6 +12,7 @@
 //! - DiscordProvider
 //! - TwitterProvider
 //! - GoogleProvider
+//! - MicrosoftProvider
 //! - FacebookProvider
 //! - SpotifyProvider
 //!
