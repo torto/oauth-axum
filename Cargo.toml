@@ -1,6 +1,6 @@
 [package]
 name = "oauth-axum"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "LGPL-3.0-or-later"
 description = "OAuth2 authorization code flow with Axum"
