@@ -134,7 +134,6 @@ pub mod providers;
 
 use async_trait::async_trait;
 use error::OauthError;
-use oauth2::http::Error;
 use std::future::Future;
 
 use oauth2::reqwest::async_http_client;
