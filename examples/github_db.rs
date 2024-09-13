@@ -79,6 +79,7 @@ pub async fn create_url(State(state): State<Arc<Client>>) -> String {
                 .unwrap();
         })
         .await
+        .ok()
         .unwrap()
         .state
         .unwrap();
@@ -98,5 +99,9 @@ pub async fn callback(
         .await
         .unwrap();
 
-    get_client().generate_token(queries.code, row.get(0)).await
+    get_client()
+        .generate_token(queries.code, row.get(0))
+        .await
+        .ok()
+        .unwrap()
 }

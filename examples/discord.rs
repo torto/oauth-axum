@@ -47,6 +47,7 @@ pub async fn create_url(Extension(state): Extension<Arc<AxumState>>) -> String {
             state.set(state_e.state, state_e.verifier);
         })
         .await
+        .ok()
         .unwrap()
         .state
         .unwrap();
@@ -63,4 +64,6 @@ pub async fn callback(
     get_client()
         .generate_token(queries.code, item.unwrap())
         .await
+        .ok()
+        .unwrap()
 }
