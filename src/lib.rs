@@ -102,6 +102,7 @@
 //!             },
 //!         )
 //!         .await
+//!         .ok()
 //!         .unwrap()
 //!         .state
 //!         .unwrap();
@@ -120,6 +121,8 @@
 //!     get_client()
 //!         .generate_token(queries.code, item.unwrap())
 //!         .await
+//!         .ok()
+//!        .unwrap()
 //! }
 //! ```
 //!
